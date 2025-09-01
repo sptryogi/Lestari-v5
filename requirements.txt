@@ -1,0 +1,14 @@
+
+Flask>=3.0.0
+supabase
+pandas
+openpyxl
+# dependensi lama tetap dipakai oleh modul lama:
+streamlit
+requests
+pymupdf
+python-docx
+pillow
+tiktoken
+python-Levenshtein
+Unidecode
