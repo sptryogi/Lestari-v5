@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lestari Bahasa</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="h-screen flex flex-col bg-gray-50">
+  <!-- Navbar atas -->
+  <header class="flex items-center justify-between bg-white border-b px-4 py-2 relative z-10">
+    <div class="flex items-center gap-3">
+      <button id="toggleSidebar" class="p-2 rounded hover:bg-gray-100">
+        <i data-lucide="panel-left-close" class="w-5 h-5"></i>
+      </button>
+      <span class="font-bold text-lg">Lestari Bahasa</span>
+    </div>
+    <div class="relative">
+      <button id="menuButton" class="p-2 rounded hover:bg-gray-100">
+        <i data-lucide="more-vertical" class="w-5 h-5"></i>
+      </button>
+      <!-- Dropdown -->
+      <div id="dropdownMenu" class="hidden absolute right-0 mt-2 w-44 bg-white border rounded shadow">
+        <button id="deleteHistory" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 w-full text-left">
+          <i data-lucide="trash-2" class="w-4 h-4"></i> Hapus Chat
+        </button>
+        <button id="printHistory" class="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 w-full text-left">
+          <i data-lucide="printer" class="w-4 h-4"></i> Print History
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Kontainer utama -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar kiri -->
+    <aside id="sidebar" class="w-64 transition-all duration-300 bg-white border-r flex flex-col z-20 relative">
+      <nav class="flex-1 p-4 space-y-2 text-sm">
+        <a href="#" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100">
+          <i data-lucide="plus-circle" class="w-5 h-5"></i><span class="sidebar-text">New Chat</span>
+        </a>
+        <a href="{{ url_for('sundalex.sundalex_view') }}" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100">
+          <i data-lucide="book" class="w-5 h-5"></i><span class="sidebar-text">SundaLex</span>
+        </a>
+        <a href="#" id="settingBtn" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100">
+          <i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Setting</span>
+        </a>
+        <a href="{{ url_for('chat.chat_view') }}" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100">
+          <i data-lucide="message-square" class="w-5 h-5"></i><span class="sidebar-text">Room-Chat</span>
+        </a>
+        
+        <!-- Room history -->
+        <div class="room-history mt-2 space-y-1 pl-8 text-xs text-gray-600">
+          <select id="roomSelect" class="form-select">
+            <option value="room1">Room 1</option>
+            <option value="room2">Room 2</option>
+            <option value="room3">Room 3</option>
+            <option value="room4">Room 4</option>
+            <option value="room5">Room 5</option>
+            <option value="room6">Room 6</option>
+          </select>
+        </div>
+      </nav>
+
+      <!-- User info -->
+      <div class="p-4 border-t text-sm flex items-center gap-2">
+        <i data-lucide="user" class="w-5 h-5"></i>
+        <div class="sidebar-text flex-1">
+          {% if session.get('user') %}
+            <div class="mb-1 text-gray-600 truncate">{{ session['user']['email'] }}</div>
+            <a class="block text-center px-3 py-1 rounded bg-gray-800 text-white text-sm" href="{{ url_for('auth.logout_view') }}">Logout</a>
+          {% else %}
+            <a class="block text-center px-3 py-1 rounded bg-emerald-600 text-white text-sm" href="{{ url_for('auth.login_view') }}">Login</a>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <!-- Panel setting -->
+    <div id="settingPanel" class="hidden absolute left-64 top-14 w-72 bg-white border rounded shadow p-4 text-sm z-30">
+      <h3 class="font-semibold mb-3">Fitur & Mode</h3>
+
+      <!-- Mode Bahasa -->
+      <label class="block mb-1">Mode Bahasa</label>
+      <select id="mode_bahasa" name="mode_bahasa" class="w-full border rounded px-2 py-1 mb-3">
+        <option value="Sunda" {{ 'selected' if session.get('mode_bahasa','Sunda')=='Sunda' else '' }}>Sunda</option>
+        <option value="Indonesia" {{ 'selected' if session.get('mode_bahasa')=='Indonesia' else '' }}>Indonesia</option>
+        <option value="English" {{ 'selected' if session.get('mode_bahasa')=='English' else '' }}>English</option>
+      </select>
+
+      <!-- Fitur -->
+      <label class="block mb-1">Fitur</label>
+      <select id="fitur" name="fitur" class="w-full border rounded px-2 py-1 mb-3">
+        <option value="chatbot" {{ 'selected' if session.get('fitur','chatbot')=='chatbot' else '' }}>Chatbot</option>
+        <option value="indo_sunda" {{ 'selected' if session.get('fitur')=='indo_sunda' else '' }}>Terjemah Indo → Sunda</option>
+        <option value="sunda_indo" {{ 'selected' if session.get('fitur')=='sunda_indo' else '' }}>Terjemah Sunda → Indo</option>
+      </select>
+
+      <!-- Mode Chat (conditional) -->
+      <div id="modeChatWrapper" class="hidden mb-3">
+        <label class="block mb-1">Mode Chat</label>
+        <select id="mode_chat" name="mode_chat" class="w-full border rounded px-2 py-1">
+          <option value="Ngobrol" {{ 'selected' if session.get('chat_mode','Ngobrol')=='Ngobrol' else '' }}>Ngobrol</option>
+          <option value="Belajar" {{ 'selected' if session.get('chat_mode')=='Belajar' else '' }}>Belajar</option>
+          <option value="Guru" {{ 'selected' if session.get('chat_mode')=='Guru' else '' }}>Guru</option>
+        </select>
+      </div>
+
+      <!-- Tingkat Tutur (conditional) -->
+      <div id="tingkatTuturWrapper" class="hidden">
+        <label class="block mb-1">Tingkat Tutur</label>
+        <select id="tingkat_tutur" name="tingkat_tutur" class="w-full border rounded px-2 py-1">
+          <option value="Loma" {{ 'selected' if session.get('tingkat_tutur','Loma')=='Loma' else '' }}>Loma</option>
+          <option value="Halus" {{ 'selected' if session.get('tingkat_tutur')=='Halus' else '' }}>Halus</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Konten kanan -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 overflow-y-auto">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    lucide.createIcons();
+
+    // Sidebar toggle
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("toggleSidebar");
+    let collapsed = false;
+    toggleBtn.addEventListener("click", () => {
+      collapsed = !collapsed;
+      if (collapsed) {
+        sidebar.classList.replace("w-64", "w-16");
+        document.querySelectorAll(".sidebar-text, .room-history").forEach(el => el.classList.add("hidden"));
+        toggleBtn.innerHTML = '<i data-lucide="panel-left-open" class="w-5 h-5"></i>';
+      } else {
+        sidebar.classList.replace("w-16", "w-64");
+        document.querySelectorAll(".sidebar-text, .room-history").forEach(el => el.classList.remove("hidden"));
+        toggleBtn.innerHTML = '<i data-lucide="panel-left-close" class="w-5 h-5"></i>';
+      }
+      lucide.createIcons();
+    });
+
+    // Dropdown menu
+    const menuButton = document.getElementById("menuButton");
+    const dropdownMenu = document.getElementById("dropdownMenu");
+
+    menuButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dropdownMenu.classList.toggle("hidden");
+    });
+    document.addEventListener("click", (e) => {
+      if (!menuButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+        dropdownMenu.classList.add("hidden");
+      }
+    });
+
+    // Setting panel toggle
+    const settingBtn = document.getElementById("settingBtn");
+    const settingPanel = document.getElementById("settingPanel");
+    settingBtn.addEventListener("click", () => settingPanel.classList.toggle("hidden"));
+
+    // --- Dynamic panel setting logic ---
+    const fiturEl = document.getElementById("fitur");
+    const modeChatWrapper = document.getElementById("modeChatWrapper");
+    const modeChatEl = document.getElementById("mode_chat");
+    const tingkatTuturWrapper = document.getElementById("tingkatTuturWrapper");
+
+    function updateSettingVisibility() {
+      const fiturVal = fiturEl.value;
+      const modeChatVal = modeChatEl.value;
+
+      if (fiturVal === "chatbot") {
+        modeChatWrapper.classList.remove("hidden");
+      } else {
+        modeChatWrapper.classList.add("hidden");
+        tingkatTuturWrapper.classList.add("hidden");
+        return;
+      }
+
+      if (modeChatVal === "Ngobrol" || modeChatVal === "Belajar") {
+        tingkatTuturWrapper.classList.remove("hidden");
+      } else {
+        tingkatTuturWrapper.classList.add("hidden");
+      }
+    }
+
+    fiturEl.addEventListener("change", updateSettingVisibility);
+    modeChatEl.addEventListener("change", updateSettingVisibility);
+    updateSettingVisibility();
+
+    // --- Hapus & Print History ---
+    document.getElementById("deleteHistory").addEventListener("click", async () => {
+      if (!confirm("Yakin mau hapus semua chat?")) return;
+      let res = await fetch("/chat/delete", { method: "POST" });
+      let data = await res.json();
+      if (data.success) {
+        document.getElementById("messages").innerHTML = "";
+        alert("History berhasil dihapus");
+      } else {
+        alert("Gagal hapus: " + (data.error || ""));
+      }
+      dropdownMenu.classList.add("hidden");
+    });
+
+    document.getElementById("printHistory").addEventListener("click", async () => {
+    let res = await fetch("/chat/history");
+    if (!res.ok) {
+      alert("Gagal ambil history");
+      return;
+    }
+    let data = await res.json();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let y = 10;
+
+    data.forEach((h) => {
+      if (h.message) {
+        doc.text(`User: ${h.message}`, 10, y);
+        y += 8;
+      }
+      if (h.response) {
+        doc.text(`Bot: ${h.response.replace(/<[^>]+>/g, '')}`, 10, y);
+        y += 8;
+      }
+      if (y > 270) { doc.addPage(); y = 10; }
+    });
+
+    doc.save("chat_history.pdf");
+    document.getElementById("dropdownMenu").classList.add("hidden");
+  });
+
+  </script>
+</body>
+</html>

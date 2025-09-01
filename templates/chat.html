@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="chat-root" class="h-full flex flex-col">
+  <!-- Messages area -->
+  <div id="messages" class="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto space-y-3 flex flex-col items-center justify-center text-gray-400">
+    <p id="welcome-text" class="text-lg text-center mb-6">Selamat datang! silahkan ajukan pertanyaan</p>
+    <!-- Composer saat kosong (centered) -->
+    <form id="composer-empty" class="flex items-center gap-2 w-full max-w-2xl justify-center">
+      <button type="button" id="attachBtnEmpty" class="p-2 rounded-full hover:bg-gray-100">
+        <i data-lucide="plus" class="w-6 h-6"></i>
+      </button>
+      <textarea id="inputEmpty" rows="1" placeholder="Tulis pesan..." class="flex-1 border rounded-xl px-3 py-2 resize-none"></textarea>
+      <button id="sendEmpty" class="p-2 rounded-full bg-emerald-600 text-white">
+        <i data-lucide="send" class="w-5 h-5"></i>
+      </button>
+    </form>
+  </div>
+
+  <!-- Composer saat ada chat -->
+  <div id="composer-bar" class="hidden border-t p-3 bg-white">
+    <!-- Status upload -->
+    <div id="uploadStatus" class="hidden text-sm text-gray-600 px-2"></div>
+    <form id="composer" class="flex items-center gap-2 max-w-4xl mx-auto">
+      <button type="button" id="attachBtn" class="p-2 rounded-full hover:bg-gray-100">
+        <i data-lucide="plus" class="w-6 h-6"></i>
+      </button>
+      <textarea id="input" rows="1" placeholder="Tulis pesan..." class="flex-1 border rounded-xl px-3 py-2 resize-none"></textarea>
+      <button id="send" class="p-2 rounded-full bg-emerald-600 text-white">
+        <i data-lucide="send" class="w-5 h-5"></i>
+      </button>
+    </form>
+    <p class="mt-2 text-xs text-center text-gray-400">licensed by Lestari Bahasa</p>
+  </div>
+</div>
+
+<!-- Panel attach presisi -->
+<!-- Panel attach presisi -->
+<div id="attachPanel" 
+     class="hidden absolute bg-white border rounded shadow p-2 z-30 w-40">
+  <button id="chooseFileBtn" 
+          class="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 w-full text-left">
+    <i data-lucide="paperclip" class="w-4 h-4"></i> Attach File
+  </button>
+</div>
+
+<!-- Input file hidden -->
+<input type="file" id="fileInput" class="hidden" 
+       accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif" />
+
+<!-- Status upload -->
+<p id="uploadStatus" class="hidden text-xs text-gray-500 mt-1 px-3"></p>
+
+<button id="scrollBtn"
+  class="hidden fixed bottom-20 right-4 bg-emerald-600 text-white p-4 rounded-full shadow-lg text-xl">
+  ↓
+</button>
+
+
+<script>
+  const messagesEl = document.getElementById("messages");
+  const welcomeText = document.getElementById("welcome-text");
+  const composerEmpty = document.getElementById("composer-empty");
+  const composerBar = document.getElementById("composer-bar");
+
+  const observer = new MutationObserver(() => {
+    if (messagesEl.children.length > 2) {
+      // sembunyikan welcome + composer kosong
+      welcomeText?.classList.add("hidden");
+      composerEmpty?.classList.add("hidden");
+      messagesEl.classList.remove("items-center","justify-center","text-gray-400");
+      // munculkan composer bawah
+      composerBar.classList.remove("hidden");
+    }
+  });
+  observer.observe(messagesEl, { childList: true });
+
+  // Attach panel posisinya tepat di atas tombol +
+  const attachBtn = document.getElementById("attachBtn");
+  const attachPanel = document.getElementById("attachPanel");
+
+  attachBtn.addEventListener("click", () => {
+    if (!attachPanel.classList.contains("hidden")) {
+      attachPanel.classList.add("hidden");
+      return;
+    }
+
+    // sementara tampilkan (tapi transparan) biar bisa hitung size
+    attachPanel.style.visibility = "hidden";
+    attachPanel.classList.remove("hidden");
+
+    const rect = attachBtn.getBoundingClientRect();
+
+    attachPanel.style.left = (rect.left + rect.width / 2 - attachPanel.offsetWidth / 2) + "px";
+    attachPanel.style.top = (rect.top - attachPanel.offsetHeight - 8) + "px";
+
+    // sekarang munculkan beneran
+    attachPanel.style.visibility = "visible";
+  });
+
+  // tutup panel kalau klik luar
+  document.addEventListener("click", (e) => {
+    if (!attachPanel.contains(e.target) && !attachBtns.some(b => b && b.contains(e.target))) {
+      attachPanel.classList.add("hidden");
+    }
+  });
+
+  // function scrollToBottom() {
+  //   messagesEl.scrollTop = messagesEl.scrollHeight;
+  // }
+  function scrollToBottom(force = true) {
+    if (force) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } else {
+      const nearBottom =
+        messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+      if (nearBottom) {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    }
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.3/dist/purify.min.js"></script>
+<script>
+  function formatAiResponse(text) {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")   // bold
+      .replace(/\n- /g, "<br>• ")               // bullet
+      .replace(/\n\n/g, "<br><br>");            // paragraf
+  }  
+</script>
+<script>
+  async function loadHistory() {
+    try {
+      const roomId = document.getElementById("roomSelect")?.value || "room1";
+      let res = await fetch(`/history?room_id=${roomId}`);
+      let data = await res.json();
+      if (!Array.isArray(data)) return;
+
+      // --- FIX: kosongkan isi pesan sebelum isi ulang ---
+      messagesEl.innerHTML = "";
+
+      data.forEach(h => {
+        if (h.message) {
+          const userDiv = document.createElement("div");
+          userDiv.className = "self-end bg-emerald-100 px-3 py-2 rounded-xl max-w-xl whitespace-pre-wrap";
+          userDiv.innerHTML = formatAiResponse(h.message);
+          messagesEl.appendChild(userDiv);
+        }
+        if (h.response) {
+          const botDiv = document.createElement("div");
+          botDiv.className = "self-start bg-gray-100 px-3 py-2 rounded-xl max-w-xl whitespace-pre-wrap";
+          botDiv.innerHTML = formatAiResponse(h.response);
+          messagesEl.appendChild(botDiv);
+        }
+      });
+
+      if (data.length > 0) {
+        welcomeText?.classList.add("hidden");
+        composerEmpty?.classList.add("hidden");
+        composerBar.classList.remove("hidden");
+        messagesEl.classList.remove("items-center","justify-center","text-gray-400");
+      }
+    } catch (err) {
+      console.error("Gagal load history:", err);
+    }
+    scrollToBottom(true);
+  }
+
+  // Panggil ketika halaman load
+  window.addEventListener("DOMContentLoaded", loadHistory);
+
+  // Ganti room
+  document.getElementById("roomSelect")?.addEventListener("change", (e) => {
+    localStorage.setItem("activeRoom", e.target.value);
+    loadHistory();
+  });
+</script>
+<script>
+  // async function sendMessage(text, target="messages") {
+  //   if (!text.trim()) return;
+
+  //   // tampilkan pesan user di UI
+  //   const msgDiv = document.createElement("div");
+  //   msgDiv.className = "self-end bg-emerald-100 px-3 py-2 rounded-xl max-w-xl";
+  //   msgDiv.innerHTML = text;
+  //   messagesEl.appendChild(msgDiv);
+
+  //   // panggil API backend
+  //   try {
+  //     const roomId = document.getElementById("roomSelect")?.value || "room1"; // atau ambil dari dropdown kalau multi room
+  //     const res = await fetch("/chat/reply", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         message: text,
+  //         fitur: document.getElementById("fitur")?.value || "chatbot",
+  //         mode_bahasa: document.getElementById("mode_bahasa")?.value || "Sunda",
+  //         chat_mode: document.getElementById("mode_chat")?.value || "Ngobrol",
+  //         tingkat_tutur: document.getElementById("tingkat_tutur")?.value || "Loma",
+  //         room_id: roomId
+  //       })
+  //     });
+  //     const data = await res.json();
+
+  //     const replyDiv = document.createElement("div");
+  //     replyDiv.className = "self-start bg-gray-100 px-3 py-2 rounded-xl max-w-xl reply-bubble";
+  //     replyDiv.innerHTML = data.reply || "(no reply)";
+  //     messagesEl.appendChild(replyDiv);
+
+
+  //   } catch (err) {
+  //     console.error("Error:", err);
+  //   }
+  //   scrollToBottom();
+  // }
+  
+  // // event untuk composer kosong
+  // document.getElementById("composer-empty")?.addEventListener("submit", (e) => {
+  //   e.preventDefault();
+  //   const input = document.getElementById("inputEmpty");
+  //   sendMessage(input.value);
+  //   input.value = "";
+  // });
+
+  // // event untuk composer aktif
+  // document.getElementById("composer")?.addEventListener("submit", (e) => {
+  //   e.preventDefault();
+  //   const input = document.getElementById("input");
+  //   sendMessage(input.value);
+  //   input.value = "";
+  // });
+  async function sendMessage(text, target="messages") {
+    if (!text.trim()) return;
+
+    const sendBtn = document.getElementById("send");
+    const sendEmptyBtn = document.getElementById("sendEmpty");
+    const input = document.getElementById("input") || document.getElementById("inputEmpty");
+
+    // tampilkan pesan user di UI
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "self-end bg-emerald-100 px-3 py-2 rounded-xl max-w-xl";
+    msgDiv.innerHTML = text;
+    messagesEl.appendChild(msgDiv);
+    scrollToBottom(true);
+
+    // tampilkan bubble loading bot
+    const loadingDiv = document.createElement("div");
+    loadingDiv.className = "self-start bg-gray-100 px-3 py-2 rounded-xl max-w-xl flex gap-1";
+    loadingDiv.innerHTML = `
+      <span class="dot animate-bounce">.</span>
+      <span class="dot animate-bounce delay-150">.</span>
+      <span class="dot animate-bounce delay-300">.</span>`;
+    messagesEl.appendChild(loadingDiv);
+    scrollToBottom(true);
+
+    // disable tombol kirim + input
+    if (sendBtn) sendBtn.disabled = true;
+    if (sendEmptyBtn) sendEmptyBtn.disabled = true;
+    if (input) input.disabled = true;
+
+    try {
+      const roomId = document.getElementById("roomSelect")?.value || "room1";
+      const res = await fetch("/chat/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          fitur: document.getElementById("fitur")?.value || "chatbot",
+          mode_bahasa: document.getElementById("mode_bahasa")?.value || "Sunda",
+          chat_mode: document.getElementById("mode_chat")?.value || "Ngobrol",
+          tingkat_tutur: document.getElementById("tingkat_tutur")?.value || "Loma",
+          room_id: roomId
+        })
+      });
+
+      const data = await res.json();
+
+      // hapus bubble loading
+      loadingDiv.remove();
+
+      // tampilkan balasan
+      const replyDiv = document.createElement("div");
+      replyDiv.className = "self-start bg-gray-100 px-3 py-2 rounded-xl max-w-xl reply-bubble whitespace-pre-wrap";
+      replyDiv.innerHTML = data.reply || "(no reply)";
+      messagesEl.appendChild(replyDiv);
+      scrollToBottom(true);
+
+    } catch (err) {
+      loadingDiv.innerText = "❌ Gagal memproses jawaban";
+      console.error("Error:", err);
+    } finally {
+      // enable lagi tombol + input
+      if (sendBtn) sendBtn.disabled = false;
+      if (sendEmptyBtn) sendEmptyBtn.disabled = false;
+      if (input) input.disabled = false;
+    }
+    scrollToBottom(true);
+  }
+
+  // event untuk composer kosong
+  document.getElementById("composer-empty")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("inputEmpty");
+    sendMessage(input.value);
+    input.value = "";
+  });
+
+  // event untuk composer aktif
+  document.getElementById("composer")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("input");
+    sendMessage(input.value);
+    input.value = "";
+  });
+
+  async function persistSettings() {
+    try {
+      await fetch("/chat/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fitur: document.getElementById("fitur")?.value || "chatbot",
+          mode_bahasa: document.getElementById("mode_bahasa")?.value || "Sunda",
+          chat_mode: document.getElementById("mode_chat")?.value || "Ngobrol",
+          tingkat_tutur: document.getElementById("tingkat_tutur")?.value || "Loma"
+        })
+      });
+    } catch (err) {
+      console.error("persistSettings error:", err);
+    }
+  }
+
+  // jalankan tiap kali dropdown berubah
+  ["fitur", "mode_chat", "mode_bahasa", "tingkat_tutur"].forEach(id => {
+    document.getElementById(id)?.addEventListener("change", persistSettings);
+  });
+
+  const scrollBtn = document.getElementById("scrollBtn");
+
+  function scrollToBottom(force=false) {
+    if (force) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } else {
+      const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+      if (nearBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+
+  messagesEl.addEventListener("scroll", () => {
+    const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 100;
+    if (nearBottom) {
+      scrollBtn.classList.add("hidden");
+    } else {
+      scrollBtn.classList.remove("hidden");
+    }
+  });
+
+  scrollBtn.addEventListener("click", () => scrollToBottom(true));
+
+  const fileInput = document.getElementById("fileInput");
+  const chooseFileBtn = document.getElementById("chooseFileBtn");
+  const uploadStatus = document.getElementById("uploadStatus");
+
+  // buka file explorer saat tombol attach diklik
+  chooseFileBtn.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  // upload setelah file dipilih
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    uploadStatus.innerText = "Mengunggah " + file.name + "...";
+    uploadStatus.classList.remove("hidden");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/chat/upload", {
+        method: "POST",
+        body: formData
+      });
+      if (!res.ok) throw new Error("Upload gagal");
+
+      uploadStatus.innerText = "✅ " + file.name + " berhasil diunggah";
+      attachPanel.classList.add("hidden"); // panel auto close
+    } catch (err) {
+      uploadStatus.innerText = "❌ Upload gagal: " + err.message;
+    }
+  });
+</script>
+{% endblock %}

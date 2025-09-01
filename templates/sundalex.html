@@ -1,0 +1,47 @@
+
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-white p-6 rounded-2xl shadow">
+  <h1 class="text-xl font-semibold mb-4">📚 SundaLex - Kamus Digital Basa Sunda</h1>
+  <form method="POST" class="flex gap-2 mb-4">
+    <input name="q" value="{{ q }}" class="flex-1 border rounded px-3 py-2" placeholder="Masukkan kata Sunda...">
+    <button class="px-4 py-2 rounded bg-emerald-600 text-white">Cari</button>
+  </form>
+  {% if results is not none %}
+    {% if results|length == 0 %}
+      <div class="text-red-600">🚫 Tidak ditemukan hasil.</div>
+    {% else %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2 px-2">LEMA</th>
+              <th class="py-2 px-2">SUBLEMA</th>
+              <th class="py-2 px-2">TINGKAT</th>
+              <th class="py-2 px-2">KLAS</th>
+              <th class="py-2 px-2">EKUIV 1</th>
+              <th class="py-2 px-2">EKUIV 2</th>
+              <th class="py-2 px-2">ARTI 1</th>
+              <th class="py-2 px-2">SINONIM</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results %}
+              <tr class="border-b">
+                <td class="py-2 px-2">{{ r['LEMA'] }}</td>
+                <td class="py-2 px-2">{{ r['SUBLEMA'] }}</td>
+                <td class="py-2 px-2">{{ r['(HALUS/LOMA/KASAR)'] }}</td>
+                <td class="py-2 px-2">{{ r['KLAS.'] }}</td>
+                <td class="py-2 px-2">{{ r['EKUIVALEN 1'] }}</td>
+                <td class="py-2 px-2">{{ r['EKUIVALEN 2'] }}</td>
+                <td class="py-2 px-2">{{ r['ARTI 1'] }}</td>
+                <td class="py-2 px-2">{{ r['SINONIM'] }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
